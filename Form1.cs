@@ -29,6 +29,8 @@ namespace Cell_designer
         private PointF[] PolygonPoints = new PointF[0];
         private PointF? highlightedPoint = null;
         int snapThreshold = 10;
+        private PointF? temporaryPoint = null;
+
         public Form1()
         {
             InitializeComponent();
@@ -305,6 +307,12 @@ namespace Cell_designer
                 // 触发 PictureBox 的重绘事件
                 pictureBox1.Invalidate();
             }
+
+            if (!isRectangleMarked && PolygonPoints.Length>0)
+            {
+                temporaryPoint = e.Location;
+                pictureBox1.Invalidate();
+            }
         }
 
         private void pictureBox1_Paint(object sender, PaintEventArgs e)
@@ -372,6 +380,16 @@ namespace Cell_designer
             if (highlightedPoint.HasValue)
             {
                 e.Graphics.FillEllipse(Brushes.Green, highlightedPoint.Value.X - 5, highlightedPoint.Value.Y - 5, 10, 10);
+            }
+
+
+            if (temporaryPoint.HasValue && PolygonPoints.Length>0)
+            {
+                List<PointF> temporaryPolygon = new List<PointF>(PolygonPoints);
+                temporaryPolygon.Add(temporaryPoint.Value);
+
+                // Draw the temporary polygon
+                e.Graphics.DrawPolygon(Pens.Red, temporaryPolygon.ToArray());
             }
         }
 
