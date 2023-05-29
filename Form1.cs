@@ -27,13 +27,65 @@ namespace Cell_designer
         JArray marks = new JArray();
         JArray marksForsave = new JArray();
         private PointF[] PolygonPoints = new PointF[0];
+        private PointF? highlightedPoint = null;
+        int snapThreshold = 10;
         public Form1()
         {
             InitializeComponent();
         }
 
+        private bool IsNear(PointF p1, PointF p2, float threshold)
+        {
+            // 计算两点之间的距离
+            float dist = (float)Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
+            // 如果距离小于阈值，则返回 true
+            return dist <= threshold;
+        }
+
         private void pictureBox1_MouseClick(object sender, MouseEventArgs e)
         {
+
+            // 吸附阈值，决定了点需要多近才会被吸附到现有顶点
+            
+
+            Point newPoint = new Point(e.X, e.Y);
+
+            // 遍历所有现有的顶点，如果新点离某个顶点很近（小于阈值），则将新点的位置设为该顶点的位置
+            foreach (JArray mark in marks)
+            {
+                string shape = mark[0].ToString();
+                if (shape == "rectangle")
+                {
+                    // 如果是矩形，检查矩形的四个顶点
+                    Point topLeft = new Point(mark[1].ToObject<int>(), mark[2].ToObject<int>());
+                    Point topRight = new Point(mark[1].ToObject<int>() + mark[3].ToObject<int>(), mark[2].ToObject<int>());
+                    Point bottomLeft = new Point(mark[1].ToObject<int>(), mark[2].ToObject<int>() + mark[4].ToObject<int>());
+                    Point bottomRight = new Point(mark[1].ToObject<int>() + mark[3].ToObject<int>(), mark[2].ToObject<int>() + mark[4].ToObject<int>());
+
+                    if (IsNear(newPoint, topLeft, snapThreshold))
+                        newPoint = topLeft;
+                    else if (IsNear(newPoint, topRight, snapThreshold))
+                        newPoint = topRight;
+                    else if (IsNear(newPoint, bottomLeft, snapThreshold))
+                        newPoint = bottomLeft;
+                    else if (IsNear(newPoint, bottomRight, snapThreshold))
+                        newPoint = bottomRight;
+                }
+                else if (shape == "polygon")
+                {
+                    // 如果是多边形，检查多边形的每个顶点
+                    for (int i = 1; i < mark.Count(); i += 2)
+                    {
+                        Point  point = new Point(mark[i].ToObject<int>(), mark[i + 1].ToObject<int>());
+                        if (IsNear(newPoint, point, snapThreshold))
+                        {
+                            newPoint = point;
+                            break;
+                        }
+                    }
+                }
+            }
+
             if (isRectangleMarked)
             {
                 //Console.WriteLine(clickCount);
@@ -43,16 +95,16 @@ namespace Cell_designer
                 if (clickCount == 1)
                 {
                     // 记录起点
-                    startPoint = e.Location;
+                    startPoint = newPoint;
                 }
                 // 如果是第二次单击
                 else if (clickCount == 2)
                 {
                     // 计算矩形的位置和大小
-                    int x = Math.Min(startPoint.X, e.X);
-                    int y = Math.Min(startPoint.Y, e.Y);
-                    int width = Math.Abs(startPoint.X - e.X);
-                    int height = Math.Abs(startPoint.Y - e.Y);
+                    int x = Math.Min(startPoint.X, newPoint.X);
+                    int y = Math.Min(startPoint.Y, newPoint.Y);
+                    int width = Math.Abs(startPoint.X - newPoint.X);
+                    int height = Math.Abs(startPoint.Y - newPoint.Y);
                     // 更新 rectangle 变量
                     rectangle = new System.Drawing.Rectangle(x, y, width, height);
                     // 触发 PictureBox 的重绘事件
@@ -64,7 +116,7 @@ namespace Cell_designer
             else
             {
 
-                Point point = new Point(e.X, e.Y);
+                Point point = newPoint;
 
                 // 将鼠标单击的位置添加到 PolygonPoints 数组中
                 Array.Resize(ref PolygonPoints, PolygonPoints.Length + 1);
@@ -98,6 +150,93 @@ namespace Cell_designer
 
         private void pictureBox1_MouseMove(object sender, MouseEventArgs e)
         {
+            
+
+            PointF newPoint = new PointF(e.X, e.Y);
+
+            // 初始设置为 null，表示没有顶点被高亮
+            highlightedPoint = null;
+
+            // 和 MouseClick 方法类似，检查鼠标当前位置是否靠近任何顶点
+            foreach (JArray mark in marks)
+            {
+                string shape = mark[0].ToString();
+                if (shape == "rectangle")
+                {
+                    int x = mark[1].ToObject<int>();
+                    int y = mark[2].ToObject<int>();
+                    int width = mark[3].ToObject<int>();
+                    int height = mark[4].ToObject<int>();
+
+                    // Check the four corners of the rectangle
+                    if (Math.Abs(newPoint.X - x) < snapThreshold && Math.Abs(newPoint.Y - y) < snapThreshold)
+                    {
+                        highlightedPoint = new PointF(x, y);
+                        if (Cursor.Position != pictureBox1.PointToScreen(new Point(x, y)))
+                        {
+                            Cursor.Position = pictureBox1.PointToScreen(new Point(x, y));
+                        }
+                        break;
+                    }
+
+                    // 右上角
+                    if (Math.Abs(newPoint.X - (x + width)) < snapThreshold && Math.Abs(newPoint.Y - y) < snapThreshold)
+                    {
+                        highlightedPoint = new PointF(x + width, y);
+                        if (Cursor.Position != pictureBox1.PointToScreen(new Point(x + width, y)))
+                        {
+                            Cursor.Position = pictureBox1.PointToScreen(new Point(x + width, y));
+                        }
+                        
+                        break;
+                    }
+
+                    // 左下角
+                    if (Math.Abs(newPoint.X - x) < snapThreshold && Math.Abs(newPoint.Y - (y + height)) < snapThreshold)
+                    {
+                        highlightedPoint = new PointF(x, y + height);
+                        if (Cursor.Position != pictureBox1.PointToScreen(new Point(x, y + height)))
+                        {
+                            Cursor.Position = pictureBox1.PointToScreen(new Point(x, y + height));
+                        }
+                        break;
+                    }
+
+                    // 右下角
+                    if (Math.Abs(newPoint.X - (x + width)) < snapThreshold && Math.Abs(newPoint.Y - (y + height)) < snapThreshold)
+                    {
+                        highlightedPoint = new PointF(x + width, y + height);
+                        if (Cursor.Position != pictureBox1.PointToScreen(new Point(x + width, y + height)))
+                        {
+                            Cursor.Position = pictureBox1.PointToScreen(new Point(x + width, y + height));
+                        }
+                        
+                        break;
+                    }
+                }
+                else if (shape == "polygon")
+                {
+                    for (int i = 1; i < mark.Count(); i += 2)
+                    {
+                        int x = mark[i].ToObject<int>();
+                        int y = mark[i + 1].ToObject<int>();
+                        if (Math.Abs(newPoint.X - x) < snapThreshold && Math.Abs(newPoint.Y - y) < snapThreshold)
+                        {
+                            highlightedPoint = new PointF(x, y);
+                            if (Cursor.Position != pictureBox1.PointToScreen(new Point(x, y)))
+                            {
+                                Cursor.Position = pictureBox1.PointToScreen(new Point(x, y));
+                            }
+                            
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 因为 highlightedPoint 已经改变，所以需要重新绘制 pictureBox
+            pictureBox1.Invalidate();
+
             int originalHeight = this.pictureBox1.Image.Height;
 
             PropertyInfo rectangleProperty = this.pictureBox1.GetType().GetProperty("ImageRectangle", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -229,6 +368,10 @@ namespace Cell_designer
                     // 画出多边形
                     g.DrawPolygon(Pens.Red, PolygonPoints);
                 }
+            }
+            if (highlightedPoint.HasValue)
+            {
+                e.Graphics.FillEllipse(Brushes.Green, highlightedPoint.Value.X - 5, highlightedPoint.Value.Y - 5, 10, 10);
             }
         }
 
